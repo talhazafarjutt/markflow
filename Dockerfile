@@ -1,5 +1,5 @@
 # Use official Python base image
-FROM python:3.10-slim-buller
+FROM python:3.10-slim
 
 # Set environment variables
 ENV PYTHONUNBUFFERED=1 \
