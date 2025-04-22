@@ -1,37 +1,38 @@
-# Use official Python base image
-FROM python:3.10-slim
+# Use an official lightweight Python image.
+FROM python:3.10-slim-buster
 
-# Set environment variables
+# Prevents Python from writing pyc files to disc and buffers stdout/stderr.
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
-    DJANGO_SETTINGS_MODULE=core.settings
+    DJANGO_SETTINGS_MODULE=markflow.settings
+
+# Install system dependencies and create a virtual environment.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+       build-essential libpq-dev \
+    && rm -rf /var/lib/apt/lists/*
 
 # Set work directory
 WORKDIR /app
 
-# Install system dependencies
-RUN apt-get update && apt-get install -y \
-    build-essential \
-    libpq-dev \
-    && rm -rf /var/lib/apt/lists/*
+# Copy and install Python dependencies
+COPY requirements.txt ./
+RUN pip install --upgrade pip \
+    && pip install --no-cache-dir -r requirements.txt
 
-# Install Python dependencies
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
-
-# Copy project files
+# Copy project
 COPY . .
 
-# Create non-root user and set permissions
-RUN useradd -m django_user && \
-    chown -R django_user:django_user /app
+# Create a non-root user and adjust permissions
+RUN useradd --create-home django_user \
+    && chown -R django_user:django_user /app
 USER django_user
 
 # Collect static files
 RUN python manage.py collectstatic --noinput
 
-# Expose the port Django runs on
+# Expose application port
 EXPOSE 8000
 
-# Production command (using Gunicorn)
-CMD ["gunicorn", "--bind", "0.0.0.0:8000", "--workers", "3", "core.wsgi:application"]
+# Default command: start Gunicorn server
+CMD ["gunicorn", "--bind", "0.0.0.0:8000", "markflow.wsgi:application"]
