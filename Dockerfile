@@ -6,14 +6,25 @@ ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     DJANGO_SETTINGS_MODULE=markflow.settings
 
-# Install system dependencies, including SQLite 3.34+ and its headers
+# Install system dependencies, including tools to build SQLite
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
        build-essential \
        libpq-dev \
        sqlite3 \
        libsqlite3-dev \
+       wget \
     && rm -rf /var/lib/apt/lists/*
+
+# Install a newer SQLite version from source
+RUN wget https://www.sqlite.org/2023/sqlite-autoconf-3410100.tar.gz && \
+    tar xvf sqlite-autoconf-3410100.tar.gz && \
+    cd sqlite-autoconf-3410100 && \
+    ./configure && \
+    make && \
+    make install && \
+    cd .. && \
+    rm -rf sqlite-autoconf-3410100 sqlite-autoconf-3410100.tar.gz
 
 # Set working directory
 WORKDIR /app
@@ -40,5 +51,5 @@ RUN mkdir -p /app/staticfiles \
 # Expose port Django runs on
 EXPOSE 8000
 
-# Launch the application with Gunicorn
-CMD ["gunicorn", "--bind", "0.0.0.0:8000", "markflow.wsgi:application"]
+# Launch the application with Gunicorn, using the newer SQLite library
+CMD ["sh", "-c", "LD_LIBRARY_PATH=/usr/local/lib gunicorn --bind 0.0.0.0:8000 markflow.wsgi:application"]
