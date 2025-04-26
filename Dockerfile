@@ -1,38 +1,44 @@
-# Use an official lightweight Python image.
-FROM python:3.10-slim-buster
+# Use an official Python image based on Debian Bullseye (includes SQLite 3.34+)
+FROM python:3.10-slim-bullseye
 
-# Prevents Python from writing pyc files to disc and buffers stdout/stderr.
+# Prevent Python from writing .pyc files and buffer stdout/stderr
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     DJANGO_SETTINGS_MODULE=markflow.settings
 
-# Install system dependencies and create a virtual environment.
+# Install system dependencies, including SQLite 3.34+ and its headers
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
-       build-essential libpq-dev \
+       build-essential \
+       libpq-dev \
+       sqlite3 \
+       libsqlite3-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Set work directory
+# Set working directory
 WORKDIR /app
 
-# Copy and install Python dependencies
+# Install Python dependencies
 COPY requirements.txt ./
 RUN pip install --upgrade pip \
     && pip install --no-cache-dir -r requirements.txt
 
-# Copy project
+# Copy application code
 COPY . .
 
-# Create a non-root user and adjust permissions
+# Create and grant permissions to a non-root user
 RUN useradd --create-home django_user \
     && chown -R django_user:django_user /app
+
+# Switch to non-root user
 USER django_user
 
-# Collect static files
-RUN python manage.py collectstatic --noinput
+# Ensure static root directory exists and collect static files
+RUN mkdir -p /app/staticfiles \
+    && python manage.py collectstatic --noinput
 
-# Expose application port
+# Expose port Django runs on
 EXPOSE 8000
 
-# Default command: start Gunicorn server
+# Launch the application with Gunicorn
 CMD ["gunicorn", "--bind", "0.0.0.0:8000", "markflow.wsgi:application"]
